@@ -2054,21 +2054,17 @@ function buildForms(){
 async function gerarNumeroReceita(){
   const el = document.getElementById('rec-cod');
   if(!el) return;
-  // Em modo edição, preserva o número original do documento — não gera um novo.
+  // Em modo edição, preserva o número original.
   if(_editandoId) return;
+  // Já tem número preenchido (voltou para a tela sem resetar) — não gera novo.
+  if(el.value && el.value.trim()) return;
   const ano = new Date().getFullYear();
-  // Usa transação atômica para reservar o número imediatamente,
-  // evitando duplicatas quando dois documentos são abertos simultaneamente.
-  let proximo = null;
-  await db.ref('config/seq_receita').transaction(seq => {
-    if(!seq || seq.ano !== ano) { seq = {ano, ultimo: 0}; }
-    seq.ultimo = (seq.ultimo || 0) + 1;
-    proximo = seq.ultimo;
-    return seq;
-  });
-  if(!proximo) return;
+  // Lê apenas — o número é reservado definitivamente só ao salvar.
+  const snap = await db.ref('config/seq_receita').once('value');
+  const seq = snap.val() || {ano, ultimo: 0};
+  const proximo = (seq.ano === ano) ? (seq.ultimo + 1) : 1;
   el.value = String(proximo).padStart(3,'0') + '/' + ano;
-  window._recSeqPendente = null; // já foi commitado pela transação
+  window._recSeqPendente = {ano, proximo};
 }
 
 function preencherARTReceita(){
@@ -4600,10 +4596,22 @@ async function enviarParaAssinatura(destino) {
   if(!_recIdAtual) _recIdAtual = uid();
   const id = _recIdAtual;
 
-  // Confirma sequência numérica no Firebase ao salvar
+  // Confirma sequência numérica no Firebase ao salvar (transação atômica)
   if(window._recSeqPendente){
     const {ano, proximo} = window._recSeqPendente;
-    await db.ref('config/seq_receita').set({ano, ultimo: proximo});
+    let numFinal = proximo;
+    await db.ref('config/seq_receita').transaction(seq => {
+      if(!seq || seq.ano !== ano){ seq = {ano, ultimo: 0}; }
+      // Se outro usuário já avançou além do nosso número, pega o próximo disponível
+      if((seq.ultimo||0) >= proximo){ numFinal = (seq.ultimo||0) + 1; }
+      seq.ultimo = numFinal; seq.ano = ano;
+      return seq;
+    });
+    // Atualiza campo se o número mudou por conflito
+    if(numFinal !== proximo){
+      const codEl = document.getElementById('rec-cod');
+      if(codEl) codEl.value = String(numFinal).padStart(3,'0') + '/' + ano;
+    }
     window._recSeqPendente = null;
   }
 
@@ -6950,7 +6958,17 @@ async function salvarEGerarGuia() {
 
   if(window._recSeqPendente){
     const {ano, proximo} = window._recSeqPendente;
-    await db.ref('config/seq_receita').set({ano, ultimo: proximo});
+    let numFinal = proximo;
+    await db.ref('config/seq_receita').transaction(seq => {
+      if(!seq || seq.ano !== ano){ seq = {ano, ultimo: 0}; }
+      if((seq.ultimo||0) >= proximo){ numFinal = (seq.ultimo||0) + 1; }
+      seq.ultimo = numFinal; seq.ano = ano;
+      return seq;
+    });
+    if(numFinal !== proximo){
+      const codEl = document.getElementById('rec-cod');
+      if(codEl) codEl.value = String(numFinal).padStart(3,'0') + '/' + ano;
+    }
     window._recSeqPendente = null;
   }
 
