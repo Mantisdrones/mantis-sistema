@@ -5158,7 +5158,7 @@ async function salvarReceitaEdicao() {
     const atualizacaoRec = {
       cliente: d.c.nome, clienteDoc: d.c.doc||'', clienteCidade: d.c.cidade||'',
       fazenda: fazNome, fazendas: d.fazendas||[],
-      data: d.data, cod: d.cod||'', diag: d.diag||'',
+      data: d.data, cod: existente.cod||d.cod||'', diag: d.diag||'',
       cultura: d.cultura||'', areap: d.areap||'', area: d.areap||'',
       calda: d.calda||'', nAplics: d.nAplics||'',
       serie: d.serie||'', art: d.art||'',
