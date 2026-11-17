@@ -8701,7 +8701,7 @@ function gerarRelatorioMes(){
       ${Object.entries(comPessoa).map(([nome,val])=>`
         <div style="background:white;border-radius:8px;padding:10px 14px;border:1px solid #fcc">
           <div style="font-size:11px;color:#888;margin-bottom:3px">${nome}</div>
-          <div style="font-size:16px;font-weight:800;color:#c0392b">${fmt(val)}</div>
+          <div style="font-size:16px;font-weight:800;color:#c0392b">${fmt((val.ind||0)+(val.apl||0))}</div>
         </div>`).join('')}
     </div>
   </div>` : ''}
