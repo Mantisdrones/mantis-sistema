@@ -2060,7 +2060,7 @@ async function gerarNumeroReceita(){
   if(el.value && el.value.trim()) return;
   const ano = new Date().getFullYear();
   // Lê apenas — o número é reservado definitivamente só ao salvar.
-  const snap = await db.ref('config/seq_receita').once('value');
+  const snap = await db.ref('seq_receita').once('value');
   const seq = snap.val() || {ano, ultimo: 0};
   const proximo = (seq.ano === ano) ? (seq.ultimo + 1) : 1;
   el.value = String(proximo).padStart(3,'0') + '/' + ano;
@@ -4600,7 +4600,7 @@ async function enviarParaAssinatura(destino) {
   if(window._recSeqPendente){
     const {ano, proximo} = window._recSeqPendente;
     let numFinal = proximo;
-    await db.ref('config/seq_receita').transaction(seq => {
+    await db.ref('seq_receita').transaction(seq => {
       if(!seq || seq.ano !== ano){ seq = {ano, ultimo: 0}; }
       // Se outro usuário já avançou além do nosso número, pega o próximo disponível
       if((seq.ultimo||0) >= proximo){ numFinal = (seq.ultimo||0) + 1; }
@@ -6959,7 +6959,7 @@ async function salvarEGerarGuia() {
   if(window._recSeqPendente){
     const {ano, proximo} = window._recSeqPendente;
     let numFinal = proximo;
-    await db.ref('config/seq_receita').transaction(seq => {
+    await db.ref('seq_receita').transaction(seq => {
       if(!seq || seq.ano !== ano){ seq = {ano, ultimo: 0}; }
       if((seq.ultimo||0) >= proximo){ numFinal = (seq.ultimo||0) + 1; }
       seq.ultimo = numFinal; seq.ano = ano;
