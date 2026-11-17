@@ -8397,7 +8397,7 @@ function calcRealizadoMes(){
   const combValL    = parseFloat(_custosCfg.combVal)||0;       // R$/L
   const consumoVei  = parseFloat(_custosCfg.consumoVeiculo)||10; // km/L
   const combRecargaL= parseFloat(_custosCfg.combRecarga)||0.7;  // L por recarga de bateria
-  const mediaDiariaAlim = 150; // R$/dia por funcionário (fixo)
+  const mediaDiariaAlim = parseFloat(_custosCfg.alimentacaoDia)||150; // R$/dia por funcionário
 
   // Recargas: usa campo informado; fallback para soma das pulverizações
   const pulvLista = Object.values(_pulvCache||{});
@@ -8480,7 +8480,7 @@ function calcRealizadoMes(){
   }
   // Alimentação: negativo = economizou = verde
   if(alimentReal || alimentOrcado)
-    rows += linhaTabela('🍽️', 'Alimentação', alimentOrcado, alimentReal, dias>0?dias+'d × '+nFuncAlim+' func × R$150/dia':'');
+    rows += linhaTabela('🍽️', 'Alimentação', alimentOrcado, alimentReal, dias>0?dias+'d × '+nFuncAlim+' func × R$'+mediaDiariaAlim+'/dia':'');
 
   if(!rows){
     document.getElementById('rel-comparativo').style.display = 'none';
@@ -8788,7 +8788,8 @@ function gerarRelatorioMes(){
     const combOrcVei     = kmR>0&&combValL>0&&consumoVei>0 ? (kmR/consumoVei)*combValL : 0;
     const combOrcRecarg  = totalRecargas>0&&combValL>0 ? totalRecargas*combRecargaL*combValL : 0;
     const combOrcTotal   = combOrcVei + combOrcRecarg;
-    const alimentOrc     = diasR>0 ? diasR * nFuncAlimPdf * 150 : 0;
+    const mediaDiariaAlimPdf = parseFloat(_custosCfg.alimentacaoDia)||150;
+    const alimentOrc     = diasR>0 ? diasR * nFuncAlimPdf * mediaDiariaAlimPdf : 0;
     const custoDia       = diasMes>0 ? custoFixoTotal/diasMes : 0;
     const custoFixoPeriodo = diasR>0 ? diasR*custoDia : 0;
 
