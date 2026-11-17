@@ -814,25 +814,25 @@ tbody tr:hover td{background:#fafffe;}
             <label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">📅 Dias trabalhados</label>
             <input type="number" id="rel-dias-trabalhados" min="0" max="31" placeholder="18"
               style="width:90px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-weight:700;color:var(--g1)"
-              oninput="calcRealizadoMes()">
+              oninput="calcRealizadoMes();salvarDadosRealizados()">
           </div>
           <div style="display:flex;flex-direction:column;gap:3px">
             <label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">👥 Func. alim.</label>
             <input type="number" id="rel-func-alim" min="0" max="20" placeholder="1" value="1"
               style="width:72px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-weight:700;color:var(--g1)"
-              oninput="calcRealizadoMes()">
+              oninput="calcRealizadoMes();salvarDadosRealizados()">
           </div>
           <div style="display:flex;flex-direction:column;gap:3px">
             <label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">🚗 KM rodados</label>
             <input type="number" id="rel-km-rodados" min="0" placeholder="2400"
               style="width:90px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-weight:700;color:var(--g1)"
-              oninput="calcRealizadoMes()">
+              oninput="calcRealizadoMes();salvarDadosRealizados()">
           </div>
           <div style="display:flex;flex-direction:column;gap:3px">
             <label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">🔋 Recargas</label>
             <input type="number" id="rel-recargas" min="0" placeholder="0"
               style="width:72px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-weight:700;color:var(--g1)"
-              oninput="calcRealizadoMes()">
+              oninput="calcRealizadoMes();salvarDadosRealizados()">
           </div>
         </div>
         <!-- inputs ocultos mantidos para compatibilidade com calcRealizadoMes e PDF -->
@@ -7939,7 +7939,9 @@ function carregarPulverizacoes(){
   renderTabelaPulv();
   renderTotaisPulv();
   atualizarResumoFin();
-  calcRealizadoMes(); // atualiza comparativo quando mês muda
+  // Carrega dados realizados salvos para o mês
+  carregarDadosRealizados();
+  calcRealizadoMes();
 }
 
 function renderTotaisPulv(){
@@ -8349,6 +8351,31 @@ function calcCustosTotal(){
   const tc=document.getElementById('total-capital'); if(tc) tc.textContent=fmt(cap);
   const tf=document.getElementById('total-custo-fixo'); if(tf) tf.textContent=fmt(fix);
   atualizarResumoFin();
+}
+
+function carregarDadosRealizados(){
+  if(!_mesSel) return;
+  const dados = ((DB.finMeses||{})[_mesSel]||{}).dadosRealizados || {};
+  const setVal = (id, val) => { const el = document.getElementById(id); if(el && val!==undefined && val!=='') el.value = val; };
+  setVal('rel-dias-trabalhados', dados.dias);
+  setVal('rel-func-alim',        dados.funcAlim);
+  setVal('rel-km-rodados',       dados.km);
+  setVal('rel-recargas',         dados.recargas);
+}
+
+let _salvarDadosTimer = null;
+function salvarDadosRealizados(){
+  if(!_mesSel) return;
+  clearTimeout(_salvarDadosTimer);
+  _salvarDadosTimer = setTimeout(async ()=>{
+    const dados = {
+      dias:     document.getElementById('rel-dias-trabalhados')?.value || '',
+      funcAlim: document.getElementById('rel-func-alim')?.value || '',
+      km:       document.getElementById('rel-km-rodados')?.value || '',
+      recargas: document.getElementById('rel-recargas')?.value || '',
+    };
+    await db.ref('financeiro/meses/'+_mesSel+'/dadosRealizados').set(dados);
+  }, 800);
 }
 
 function calcRealizadoMes(){
