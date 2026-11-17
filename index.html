@@ -8871,6 +8871,11 @@ function atualizarResumoFin(){
   const pctCom  = totalFaturado>0 ? (totalComissoes/totalFaturado*100) : 0;
   const pctFixo = totalFaturado>0 ? (custoFixo/totalFaturado*100) : 0;
   const pctDesp = totalFaturado>0 ? (totalDespesas/totalFaturado*100) : 0;
+  // Percentuais normalizados para a barra visual (sempre somam 100%)
+  const totalPct = pctCom + pctFixo + pctDesp;
+  const barCom  = totalPct > 0 ? (pctCom/totalPct*100)  : 0;
+  const barFixo = totalPct > 0 ? (pctFixo/totalPct*100) : 0;
+  const barDesp = totalPct > 0 ? (pctDesp/totalPct*100) : 0;
   const corMargem = margem >= 20 ? '#1a5c38' : margem >= 0 ? '#7a5200' : '#c0392b';
   const bgMargem  = margem >= 20 ? 'linear-gradient(135deg,#1a5c38,#2e7d32)' : margem >= 0 ? 'linear-gradient(135deg,#7a5200,#b8860b)' : 'linear-gradient(135deg,#8b0000,#c0392b)';
 
@@ -8948,8 +8953,8 @@ function atualizarResumoFin(){
       ${totalFaturado>0?`
       <div style="border-radius:4px;overflow:hidden;height:7px;display:flex;margin-bottom:7px;background:#e0e0e0">
         ${lucroReal>0?`<div style="background:#1e6e38;width:${Math.min(lucroReal/totalFaturado*100,100).toFixed(1)}%" title="Lucro"></div>`:''}
-        <div style="background:#d4a010;width:${pctCom.toFixed(1)}%" title="Comissões"></div>
-        <div style="background:#e67e22;width:${pctFixo.toFixed(1)}%" title="Custo Fixo"></div>
+        <div style="background:#d4a010;width:${barCom.toFixed(1)}%" title="Comissões"></div>
+        <div style="background:#e67e22;width:${barFixo.toFixed(1)}%" title="Custo Fixo"></div>
         <div style="background:#e74c3c;flex:1;min-width:2px" title="Despesas"></div>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
