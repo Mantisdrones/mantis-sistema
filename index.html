@@ -1464,6 +1464,7 @@ function setupRealtimeListeners(){
       _pulvCache = DB.finMeses[_mesSel].pulverizacoes||{};
       renderTabelaPulv();
       renderTotaisPulv();
+      carregarDadosRealizados();
     }
   });
   db.ref('financeiro/despesas').on('value', snap=>{
