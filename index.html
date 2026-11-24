@@ -8198,12 +8198,21 @@ function popularSelectClientes(){
 function renderTabelaPulv(){
   const el  = document.getElementById('fin-tabela-pulv');
   const fmt = v => 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const lista = Object.values(_pulvCache).sort((a,b)=>(a.data||'')>(b.data||'')?1:-1);
+  const listaTotal = Object.values(_pulvCache).sort((a,b)=>(a.data||'')>(b.data||'')?1:-1);
 
-  if(!lista.length){
+  if(!listaTotal.length){
     el.innerHTML='<div class="empty"><div class="empty-icon">📋</div><p>Nenhum serviço lançado neste mês</p></div>';
     return;
   }
+
+  // Filtros ativos
+  const filtData    = (document.getElementById('pulv-filtro-data')||{}).value||'';
+  const filtCliente = ((document.getElementById('pulv-filtro-cliente')||{}).value||'').toLowerCase().trim();
+  const lista = listaTotal.filter(p=>{
+    if(filtData    && (p.data||'')!==filtData) return false;
+    if(filtCliente && !(p.cliente||'').toLowerCase().includes(filtCliente)) return false;
+    return true;
+  });
 
   const totalArea   = lista.reduce((s,p)=>s+(parseFloat(p.area)||0),0);
   const totalVal    = lista.reduce((s,p)=>s+(parseFloat(p.total)||0),0);
@@ -8220,8 +8229,24 @@ function renderTabelaPulv(){
   const custoFixo  = (_custosCfg.custoFixo||[]).reduce((s,i)=>s+(parseFloat(i.valor)||0),0);
   const lucro      = totalVal - totalCom - despesas - custoFixo;
 
-  // ── Tabela principal (sem duplicar resumo — já existe abaixo em Resumo Financeiro do Mês) ──
-  el.innerHTML = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;min-width:700px">
+  // datas únicas para o select de filtro
+  const datasUnicas = [...new Set(listaTotal.map(p=>p.data||'').filter(Boolean))].sort();
+  const filtDataAtual    = (document.getElementById('pulv-filtro-data')||{}).value||'';
+  const filtClienteAtual = (document.getElementById('pulv-filtro-cliente')||{}).value||'';
+
+  // ── Tabela principal ──
+  el.innerHTML = `
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f4f7f5;border-bottom:1px solid #e3ebe6;flex-wrap:wrap">
+    <span style="font-size:11px;font-weight:700;color:#4a6a58">Filtrar:</span>
+    <select id="pulv-filtro-data" onchange="renderTabelaPulv()" style="font-size:12px;padding:5px 10px;border:1px solid #d0ddd6;border-radius:7px;background:white;color:#1a3028;cursor:pointer">
+      <option value="">Todas as datas</option>
+      ${datasUnicas.map(d=>`<option value="${d}"${d===filtDataAtual?' selected':''}>${new Date(d+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'})}</option>`).join('')}
+    </select>
+    <input id="pulv-filtro-cliente" type="text" placeholder="Buscar cliente..." value="${filtClienteAtual.replace(/"/g,'&quot;')}" oninput="renderTabelaPulv()" style="font-size:12px;padding:5px 10px;border:1px solid #d0ddd6;border-radius:7px;width:180px;color:#1a3028">
+    ${(filtDataAtual||filtClienteAtual)?`<button onclick="document.getElementById('pulv-filtro-data').value='';document.getElementById('pulv-filtro-cliente').value='';renderTabelaPulv()" style="font-size:11px;padding:5px 10px;border:1px solid #d0ddd6;border-radius:7px;background:white;cursor:pointer;color:#c0392b;font-weight:600">✕ Limpar</button>`:''}
+    <span style="font-size:11px;color:#7a9080;margin-left:auto">${lista.length} de ${listaTotal.length} registro${listaTotal.length!==1?'s':''}</span>
+  </div>
+  <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;min-width:700px">
     <colgroup>
       <col style="width:58px">
       <col style="width:120px">
@@ -8236,15 +8261,15 @@ function renderTabelaPulv(){
     </colgroup>
     <thead>
       <tr style="background:var(--g1)">
-        <th style="padding:9px 10px;text-align:left;color:rgba(255,255,255,.8);font-size:11px;font-weight:700;letter-spacing:.3px">DATA</th>
-        <th style="padding:9px 10px;text-align:left;color:rgba(255,255,255,.8);font-size:11px;font-weight:700">DESCRIÇÃO</th>
-        <th style="padding:9px 10px;text-align:right;color:rgba(255,255,255,.8);font-size:11px;font-weight:700">ÁREA</th>
-        <th style="padding:9px 10px;text-align:right;color:rgba(255,255,255,.8);font-size:11px;font-weight:700">R$/HA</th>
-        <th style="padding:9px 10px;text-align:right;color:white;font-size:11px;font-weight:700">TOTAL</th>
-        <th style="padding:9px 10px;text-align:center;color:#ffd77a;font-size:11px;font-weight:700">COM. INDICAÇÃO</th>
-        <th style="padding:9px 10px;text-align:right;color:#ffd77a;font-size:11px;font-weight:700">VAL. IND.</th>
-        <th style="padding:9px 10px;text-align:center;color:#ffb3b3;font-size:11px;font-weight:700">COM. APLICAÇÃO</th>
-        <th style="padding:9px 10px;text-align:right;color:#ffb3b3;font-size:11px;font-weight:700">VAL. APL.</th>
+        <th style="padding:9px 10px;text-align:left;color:#fff!important;font-size:11px;font-weight:700;letter-spacing:.3px">Data</th>
+        <th style="padding:9px 10px;text-align:left;color:#fff!important;font-size:11px;font-weight:700">Cliente</th>
+        <th style="padding:9px 10px;text-align:right;color:#fff!important;font-size:11px;font-weight:700">Área</th>
+        <th style="padding:9px 10px;text-align:right;color:#fff!important;font-size:11px;font-weight:700">R$/ha</th>
+        <th style="padding:9px 10px;text-align:right;color:#fff!important;font-size:11px;font-weight:700">Total</th>
+        <th style="padding:9px 10px;text-align:center;color:#ffd77a!important;font-size:11px;font-weight:700">Com. Indicação</th>
+        <th style="padding:9px 10px;text-align:right;color:#ffd77a!important;font-size:11px;font-weight:700">Val. Ind.</th>
+        <th style="padding:9px 10px;text-align:center;color:#ffb3b3!important;font-size:11px;font-weight:700">Com. Aplicação</th>
+        <th style="padding:9px 10px;text-align:right;color:#ffb3b3!important;font-size:11px;font-weight:700">Val. Apl.</th>
         <th></th>
       </tr>
     </thead>
@@ -8288,7 +8313,7 @@ function renderTabelaPulv(){
         <td></td>
       </tr>
     </tfoot>
-  </table></div>`;
+  </table></div></div>`;
 }
 
 function abrirFormPulv(){
