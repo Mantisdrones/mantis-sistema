@@ -4275,8 +4275,10 @@ function renderHistorico(){
     // Pacotes de assinatura — 1 linha por pacote (guia IMA+MAPA + receita)
     Object.values(pacotes).forEach(p => {
       const temP=!!p.sigPiloto, temC=!!p.sigCliente, temA=!!p.sigAgronomo;
-      const total = 3, feitos = [temP,temC,temA].filter(Boolean).length;
-      const s = feitos===3 ? 'concluido' : feitos>0 ? 'parcial' : 'pendente';
+      const isReceita = p.receitaId && !p.guiaId;
+      const total = isReceita ? 2 : 3;
+      const feitos = isReceita ? [temC,temA].filter(Boolean).length : [temP,temC,temA].filter(Boolean).length;
+      const s = feitos===total ? 'concluido' : feitos>0 ? 'parcial' : 'pendente';
       todos.push({
         id: p.id, tipo:'pacote', cliente:p.cliente, fazenda:p.fazenda,
         data:p.data, usuario:p.criadoPor||'—', geradoEm:p.criadoEm||'—',
@@ -4485,8 +4487,11 @@ function renderDashRecentes(){
       docs.guiasIma.some(g=>g.id===p.guiaId) ||
       docs.guiasMapa.some(g=>g.id===p.guiaId)
     );
-    const totalAssinantes = pacotes.length * 3;
-    const feitos = pacotes.reduce((acc,p)=>acc+(!!p.sigPiloto)+(!!p.sigCliente)+(!!p.sigAgronomo),0);
+    const totalAssinantes = pacotes.reduce((acc,p)=>acc+((p.receitaId&&!p.guiaId)?2:3),0);
+    const feitos = pacotes.reduce((acc,p)=>{
+      const isRec=p.receitaId&&!p.guiaId;
+      return acc+(isRec?0:!!p.sigPiloto)+(!!p.sigCliente)+(!!p.sigAgronomo);
+    },0);
     const pct = totalAssinantes>0 ? Math.round((feitos/totalAssinantes)*100) : null;
     const sigBadge = pct===null
       ? '<span class="db-sig-none">Sem assinaturas</span>'
@@ -4512,10 +4517,11 @@ function renderDashRecentes(){
 function renderDashSigPendencias(){
   const el = document.getElementById('dash-sig-pendencias');
   if(!el) return;
-  const pendentes = Object.values(DB.pacotes_assinatura||{}).filter(p=>
-    (p.cliente||p.fazenda||p.data) && // ignora registros sem dados mínimos
-    !(p.sigPiloto&&p.sigCliente&&p.sigAgronomo)
-  );
+  const pendentes = Object.values(DB.pacotes_assinatura||{}).filter(p=>{
+    if(!(p.cliente||p.fazenda||p.data)) return false; // ignora registros sem dados mínimos
+    const isReceita = p.receitaId && !p.guiaId;
+    return isReceita ? !(p.sigCliente&&p.sigAgronomo) : !(p.sigPiloto&&p.sigCliente&&p.sigAgronomo);
+  });
   // Atualiza badge de contagem
   const badge = document.getElementById('db-pend-count');
   if(badge){ badge.textContent=pendentes.length; badge.style.display=pendentes.length?'':'none'; }
@@ -4524,13 +4530,13 @@ function renderDashSigPendencias(){
     return;
   }
   el.innerHTML = pendentes.slice(0,6).map(p=>{
-    const tP=!!p.sigPiloto, tC=!!p.sigCliente, tA=!!p.sigAgronomo;
+    const isReceita=p.receitaId&&!p.guiaId, tP=!!p.sigPiloto, tC=!!p.sigCliente, tA=!!p.sigAgronomo;
     const dot=(ok,label)=>`<span class="db-dot ${ok?'db-dot-ok':'db-dot-no'}">${ok?'✓':''} ${label}</span>`;
     const dataFmt = p.data?p.data.split('-').reverse().join('/'):'—';
     return `<div class="db-pend-row">
       <div class="db-pend-nome">${p.cliente||'—'}</div>
       <div class="db-pend-fazenda">${p.fazenda||'—'} · ${dataFmt}</div>
-      <div class="db-pend-dots">${dot(tP,'Piloto')}${dot(tC,'Cliente')}${dot(tA,'Agrônomo')}</div>
+      <div class="db-pend-dots">${isReceita?'':dot(tP,'Piloto')}${dot(tC,'Cliente')}${dot(tA,'Agrônomo')}</div>
     </div>`;
   }).join('');
 }
@@ -5825,7 +5831,8 @@ function renderPendenciasPacotes() {
     const lista = [];
     snap.forEach(child => {
       const v = child.val();
-      if(!(v.sigPiloto && v.sigCliente && v.sigAgronomo)) lista.push(v);
+      const isRec=v.receitaId&&!v.guiaId;
+      if(isRec ? !(v.sigCliente&&v.sigAgronomo) : !(v.sigPiloto&&v.sigCliente&&v.sigAgronomo)) lista.push(v);
     });
     if(!lista.length){
       el.innerHTML='<div class="empty"><div class="empty-icon">✅</div><p>Nenhum pacote aguardando assinatura</p></div>';
