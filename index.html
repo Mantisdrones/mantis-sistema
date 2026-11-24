@@ -4512,7 +4512,10 @@ function renderDashRecentes(){
 function renderDashSigPendencias(){
   const el = document.getElementById('dash-sig-pendencias');
   if(!el) return;
-  const pendentes = Object.values(DB.pacotes_assinatura||{}).filter(p=>!(p.sigPiloto&&p.sigCliente&&p.sigAgronomo));
+  const pendentes = Object.values(DB.pacotes_assinatura||{}).filter(p=>
+    (p.cliente||p.fazenda||p.data) && // ignora registros sem dados mínimos
+    !(p.sigPiloto&&p.sigCliente&&p.sigAgronomo)
+  );
   // Atualiza badge de contagem
   const badge = document.getElementById('db-pend-count');
   if(badge){ badge.textContent=pendentes.length; badge.style.display=pendentes.length?'':'none'; }
