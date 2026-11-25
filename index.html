@@ -943,10 +943,21 @@ tbody tr:hover td{background:#fafffe;}
               oninput="calcRealizadoMes();salvarDadosRealizados()">
           </div>
           <div style="display:flex;flex-direction:column;gap:3px">
-            <label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">🚗 KM rodados</label>
-            <input type="number" id="rel-km-rodados" min="0" placeholder="2400"
+            <label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">🚗 KM inicial</label>
+            <input type="number" id="rel-km-inicial" min="0" placeholder="0"
               style="width:90px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-weight:700;color:var(--g1)"
-              oninput="calcRealizadoMes();salvarDadosRealizados()">
+              oninput="calcKmRodados()">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">🏁 KM final</label>
+            <input type="number" id="rel-km-final" min="0" placeholder="0"
+              style="width:90px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-weight:700;color:var(--g1)"
+              oninput="calcKmRodados()">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">📏 KM rodados</label>
+            <input type="number" id="rel-km-rodados" min="0" placeholder="0" readonly
+              style="width:90px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-weight:700;color:var(--g1);background:#f5f7f5;cursor:default">
           </div>
           <div style="display:flex;flex-direction:column;gap:3px">
             <label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">🔋 Recargas</label>
@@ -8537,8 +8548,40 @@ function carregarDadosRealizados(){
   const setVal = (id, val) => { const el = document.getElementById(id); if(el && val!==undefined && val!=='') el.value = val; };
   setVal('rel-dias-trabalhados', dados.dias);
   setVal('rel-func-alim',        dados.funcAlim);
-  setVal('rel-km-rodados',       dados.km);
   setVal('rel-recargas',         dados.recargas);
+  setVal('rel-km-inicial',       dados.kmInicial);
+  setVal('rel-km-final',         dados.kmFinal);
+  // km rodado = final - inicial (ou legado: apenas km salvo)
+  const elRod = document.getElementById('rel-km-rodados');
+  if(elRod){
+    if(dados.kmInicial && dados.kmFinal){
+      elRod.value = Math.max(0, (parseFloat(dados.kmFinal)||0) - (parseFloat(dados.kmInicial)||0));
+    } else if(dados.km){
+      elRod.value = dados.km; // compatibilidade com registros antigos
+    } else {
+      elRod.value = '';
+    }
+  }
+  // Se kmInicial não está salvo, tenta pré-preencher com kmFinal do mês anterior
+  if(!dados.kmInicial){
+    const [ano, mes] = _mesSel.split('-').map(Number);
+    const mesAnt = mes===1 ? `${ano-1}-12` : `${ano}-${String(mes-1).padStart(2,'0')}`;
+    const dadosAnt = ((DB.finMeses||{})[mesAnt]||{}).dadosRealizados || {};
+    if(dadosAnt.kmFinal){
+      const elIni = document.getElementById('rel-km-inicial');
+      if(elIni && !elIni.value) elIni.value = dadosAnt.kmFinal;
+    }
+  }
+}
+
+function calcKmRodados(){
+  const ini = parseFloat(document.getElementById('rel-km-inicial')?.value)||0;
+  const fim = parseFloat(document.getElementById('rel-km-final')?.value)||0;
+  const rod = fim > ini ? fim - ini : (fim > 0 || ini > 0 ? Math.max(0, fim - ini) : 0);
+  const elRod = document.getElementById('rel-km-rodados');
+  if(elRod) elRod.value = (ini || fim) ? rod : '';
+  calcRealizadoMes();
+  salvarDadosRealizados();
 }
 
 let _salvarDadosTimer = null;
@@ -8546,13 +8589,32 @@ function salvarDadosRealizados(){
   if(!_mesSel) return;
   clearTimeout(_salvarDadosTimer);
   _salvarDadosTimer = setTimeout(async ()=>{
+    const kmInicial = document.getElementById('rel-km-inicial')?.value || '';
+    const kmFinal   = document.getElementById('rel-km-final')?.value   || '';
+    const kmRod     = document.getElementById('rel-km-rodados')?.value  || '';
     const dados = {
-      dias:     document.getElementById('rel-dias-trabalhados')?.value || '',
-      funcAlim: document.getElementById('rel-func-alim')?.value || '',
-      km:       document.getElementById('rel-km-rodados')?.value || '',
-      recargas: document.getElementById('rel-recargas')?.value || '',
+      dias:      document.getElementById('rel-dias-trabalhados')?.value || '',
+      funcAlim:  document.getElementById('rel-func-alim')?.value || '',
+      km:        kmRod,
+      kmInicial: kmInicial,
+      kmFinal:   kmFinal,
+      recargas:  document.getElementById('rel-recargas')?.value || '',
     };
     await db.ref('financeiro/meses/'+_mesSel+'/dadosRealizados').set(dados);
+    // Propagar kmFinal como kmInicial do mês seguinte (se ainda não preenchido)
+    if(kmFinal && _mesSel){
+      const [ano, mes] = _mesSel.split('-').map(Number);
+      const mesProx = mes===12 ? `${ano+1}-01` : `${ano}-${String(mes+1).padStart(2,'0')}`;
+      const snapProx = await db.ref('financeiro/meses/'+mesProx+'/dadosRealizados/kmInicial').once('value');
+      if(!snapProx.val()){
+        await db.ref('financeiro/meses/'+mesProx+'/dadosRealizados/kmInicial').set(kmFinal);
+        // Se DB.finMeses já tem o mês seguinte em cache, atualiza local
+        if(DB.finMeses && DB.finMeses[mesProx]){
+          DB.finMeses[mesProx].dadosRealizados = DB.finMeses[mesProx].dadosRealizados || {};
+          DB.finMeses[mesProx].dadosRealizados.kmInicial = kmFinal;
+        }
+      }
+    }
   }, 800);
 }
 
