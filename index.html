@@ -8283,9 +8283,9 @@ function renderTabelaPulv(){
 
   // badges de status
   const statusBadge = s => {
-    if(s==='agendado')  return `<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#1565c0;background:#e3f0ff;padding:2px 7px;border-radius:4px;cursor:pointer">📅 Agendado</span>`;
-    if(s==='cancelado') return `<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#b71c1c;background:#fdeaea;padding:2px 7px;border-radius:4px;cursor:pointer">❌ Cancelado</span>`;
-    return                     `<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#1a7a40;background:#e6f9ee;padding:2px 7px;border-radius:4px;cursor:pointer">✅ Executado</span>`;
+    if(s==='agendado')  return `<span style="display:inline-block;font-size:10px;font-weight:700;color:#1565c0;background:#e3f0ff;padding:1px 6px;border-radius:3px;white-space:nowrap">📅 Agendado</span>`;
+    if(s==='cancelado') return `<span style="display:inline-block;font-size:10px;font-weight:700;color:#b71c1c;background:#fdeaea;padding:1px 6px;border-radius:3px;white-space:nowrap">❌ Cancelado</span>`;
+    return                     `<span style="display:inline-block;font-size:10px;font-weight:700;color:#1a7a40;background:#e6f9ee;padding:1px 6px;border-radius:3px;white-space:nowrap">✅ Executado</span>`;
   };
   const nextStatus = s => s==='agendado' ? 'executado' : s==='executado' ? 'cancelado' : 'agendado';
 
@@ -8307,22 +8307,22 @@ function renderTabelaPulv(){
     ${(filtDataAtual||filtCliente||filtStatusAtual)?`<button onclick="['pulv-filtro-data','pulv-filtro-cliente','pulv-filtro-status'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});renderTabelaPulv()" style="font-size:10px;padding:4px 8px;border:1px solid #fcc;border-radius:5px;background:#fff5f5;cursor:pointer;color:#c0392b;font-weight:600">✕ Limpar</button>`:''}
     <span style="font-size:10px;color:#8aaa96;margin-left:auto;font-weight:500">${lista.length === listaTotal.length ? listaTotal.length+' registros' : lista.length+'/'+listaTotal.length}</span>
   </div>
-  <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;min-width:640px">
+  <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;min-width:860px">
     <colgroup>
-      <col style="width:110px"><col style="width:130px"><col style="width:48px">
-      <col style="width:58px"><col style="width:72px"><col style="width:120px"><col style="width:52px">
-      <col style="width:130px"><col style="width:52px"><col style="width:36px">
+      <col style="width:88px"><col style="width:140px"><col style="width:52px">
+      <col style="width:52px"><col style="width:84px"><col style="width:130px"><col style="width:72px">
+      <col style="width:150px"><col style="width:72px"><col style="width:40px">
     </colgroup>
     <thead><tr>
-      <th style="${thMuted};text-align:left">Data / Status</th>
+      <th style="${thMuted};text-align:left">Data</th>
       <th style="${thMuted};text-align:left">Cliente</th>
       <th style="${thMuted};text-align:right">Área</th>
       <th style="${thMuted};text-align:right">R$/ha</th>
       <th style="${thWhite};text-align:right">Total</th>
-      <th style="${thAmber};text-align:center">Ind. — Nome (%) / Valor</th>
-      <th style="${thAmber};text-align:right"></th>
-      <th style="${thSalmon};text-align:center">Apl. — Nome (R$/ha) / Valor</th>
-      <th style="${thSalmon};text-align:right"></th>
+      <th style="${thAmber};text-align:left">Indicação</th>
+      <th style="${thAmber};text-align:right">Valor Ind.</th>
+      <th style="${thSalmon};text-align:left">Aplicação</th>
+      <th style="${thSalmon};text-align:right">Valor Apl.</th>
       <th style="${thBase}"></th>
     </tr></thead>
     <tbody>
@@ -8341,24 +8341,27 @@ function renderTabelaPulv(){
       const aplValHtml = apls.length
         ? apls.map(a=>`<div style="font-weight:700;color:${isCancelado?'#ccc':'var(--red)'};white-space:nowrap;text-align:right">${fmt(a.val||(a.rpha||0)*parseFloat(p.area||0))}</div>`).join('')
         : '<div style="color:var(--text3);text-align:right">—</div>';
-      const rowStyle = isCancelado ? 'background:#fafafa;opacity:.6' : i%2===1 ? 'background:#fafffe' : '';
-      const tdStyle = `padding:5px 6px;${isCancelado?'text-decoration:line-through;color:#aaa':''}`;
+      const rowStyle = isCancelado ? 'background:#fafafa;opacity:.65' : i%2===1 ? 'background:#fafffe' : '';
+      const tdStyle = `padding:7px 8px;${isCancelado?'text-decoration:line-through;color:#aaa':''}`;
+      const dataFmt = p.data ? new Date(p.data+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '—';
       return `<tr style="border-bottom:1px solid #eef3f0;${rowStyle}">
-        <td style="padding:5px 6px;white-space:nowrap">
-          <div style="color:var(--text2);font-size:11px;${isCancelado?'text-decoration:line-through;color:#aaa':''}">${p.data?new Date(p.data+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'—'}</div>
-          <div onclick="alternarStatusPulv('${p.id}','${nextStatus(st)}')" title="Clique para: ${nextStatus(st)}" style="cursor:pointer;margin-top:2px">${statusBadge(st)}</div>
+        <td style="padding:6px 8px;white-space:nowrap;vertical-align:middle">
+          <div style="display:flex;align-items:center;gap:5px;flex-wrap:nowrap">
+            <span style="font-size:12px;color:var(--text2);${isCancelado?'text-decoration:line-through;color:#aaa':''}">${dataFmt}</span>
+            <span onclick="alternarStatusPulv('${p.id}','${nextStatus(st)}')" title="Clique para: ${nextStatus(st)}" style="cursor:pointer;flex-shrink:0">${statusBadge(st)}</span>
+          </div>
         </td>
-        <td style="${tdStyle};font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.cliente||''}">${p.cliente||'—'}${p.obs?`<div style="font-size:9px;color:#aaa;font-weight:400;text-decoration:none">${p.obs}</div>`:''}</td>
-        <td style="${tdStyle};text-align:right">${parseFloat(p.area||0).toFixed(1)}</td>
-        <td style="${tdStyle};text-align:right;color:var(--text2)">${parseFloat(p.valorHa||0).toFixed(0)}</td>
-        <td style="${tdStyle};text-align:right;font-weight:800;color:${isCancelado?'#aaa':'var(--g1)'}">${fmt(p.total)}</td>
-        <td style="padding:5px 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${isCancelado?'#ccc':'#7a5200'};font-size:10px">${comIndNome?(comIndNome+(comIndPct?' ('+comIndPct.toFixed(0)+'%)':'')):'—'}</td>
-        <td style="${tdStyle};text-align:right;font-weight:700;color:${isCancelado?'#ccc':'#b8860b'};white-space:nowrap">${comIndVal?fmt(comIndVal):'—'}</td>
-        <td style="padding:5px 6px">${aplHtml}</td>
-        <td style="padding:5px 6px">${aplValHtml}</td>
-        <td style="padding:4px 3px;text-align:center;white-space:nowrap">
-          <button class="btn btn-ghost btn-xs" onclick="editarPulv('${p.id}')" title="Editar" style="padding:2px 3px;font-size:10px">✏️</button>
-          <button class="btn btn-danger btn-xs" onclick="excluirPulv('${p.id}')" title="Excluir" style="padding:2px 3px;font-size:10px">🗑</button>
+        <td style="${tdStyle};font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle" title="${p.cliente||''}">${p.cliente||'—'}${p.obs?`<div style="font-size:10px;color:#aaa;font-weight:400;text-decoration:none">${p.obs}</div>`:''}</td>
+        <td style="${tdStyle};text-align:right;vertical-align:middle">${parseFloat(p.area||0).toFixed(1)}</td>
+        <td style="${tdStyle};text-align:right;color:var(--text2);vertical-align:middle">${parseFloat(p.valorHa||0).toFixed(0)}</td>
+        <td style="${tdStyle};text-align:right;font-weight:800;color:${isCancelado?'#aaa':'var(--g1)'};vertical-align:middle">${fmt(p.total)}</td>
+        <td style="${tdStyle};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${isCancelado?'#ccc':'#7a5200'};vertical-align:middle">${comIndNome?(comIndNome+(comIndPct?' ('+comIndPct.toFixed(0)+'%)':'')):'—'}</td>
+        <td style="${tdStyle};text-align:right;font-weight:700;color:${isCancelado?'#ccc':'#b8860b'};white-space:nowrap;vertical-align:middle">${comIndVal?fmt(comIndVal):'—'}</td>
+        <td style="${tdStyle};vertical-align:middle">${aplHtml}</td>
+        <td style="${tdStyle};vertical-align:middle">${aplValHtml}</td>
+        <td style="padding:6px 5px;text-align:center;white-space:nowrap;vertical-align:middle">
+          <button class="btn btn-ghost btn-xs" onclick="editarPulv('${p.id}')" title="Editar" style="padding:3px 5px;font-size:12px">✏️</button>
+          <button class="btn btn-danger btn-xs" onclick="excluirPulv('${p.id}')" title="Excluir" style="padding:3px 5px;font-size:12px">🗑</button>
         </td>
       </tr>`;}).join('')}
     </tbody>
