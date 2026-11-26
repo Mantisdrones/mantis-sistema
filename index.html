@@ -8313,10 +8313,8 @@ function renderTabelaPulv(){
       <th style="${thMuted};text-align:left;padding:7px 10px">Cliente</th>
       <th style="${thMuted};text-align:right;padding:7px 10px">Área</th>
       <th style="${thMuted};text-align:right;padding:7px 10px;border-right:2px solid #1a3d28">R$/ha</th>
-      <th style="${thAmber};text-align:left;padding:7px 10px">Indicação</th>
-      <th style="${thAmber};text-align:right;padding:7px 10px;border-right:2px solid #1a3d28">Valor Ind.</th>
-      <th style="${thSalmon};text-align:left;padding:7px 10px">Aplicação</th>
-      <th style="${thSalmon};text-align:right;padding:7px 10px;border-right:2px solid #1a3d28">Valor Apl.</th>
+      <th style="${thAmber};text-align:left;padding:7px 10px;border-right:2px solid #1a3d28">Indicação</th>
+      <th style="${thSalmon};text-align:left;padding:7px 10px;border-right:2px solid #1a3d28">Aplicação</th>
       <th style="${thWhite};text-align:right;padding:7px 10px">Total</th>
       <th style="${thBase};padding:7px 6px"></th>
     </tr></thead>
@@ -8331,11 +8329,9 @@ function renderTabelaPulv(){
       const apls = p.aplicadores&&p.aplicadores.length ? p.aplicadores
                  : (p.comAplNome ? [{nome:p.comAplNome,rpha:p.comAplRpha||0,val:p.comAplVal||0}] : []);
       const aplHtml = apls.length
-        ? apls.map(a=>`<div style="color:${isCancelado?'#bbb':'#7a0000'}">${abrev(a.nome)}<span style="color:#bbb;font-size:11px"> (R$${parseFloat(a.rpha||0).toFixed(2)}/ha)</span></div>`).join('')
+        ? apls.map(a=>`<div style="display:flex;align-items:baseline;gap:8px;justify-content:space-between"><span style="color:${isCancelado?'#bbb':'#7a0000'}">${abrev(a.nome)}<span style="color:#bbb;font-size:11px"> (R$${parseFloat(a.rpha||0).toFixed(2)}/ha)</span></span><span style="font-weight:700;color:${isCancelado?'#ccc':'var(--red)'};white-space:nowrap">${fmt(a.val||(a.rpha||0)*parseFloat(p.area||0))}</span></div>`).join('')
         : '—';
-      const aplValHtml = apls.length
-        ? apls.map(a=>`<div style="font-weight:700;color:${isCancelado?'#ccc':'var(--red)'}">${fmt(a.val||(a.rpha||0)*parseFloat(p.area||0))}</div>`).join('')
-        : '—';
+      const aplValHtml = '';
       const rowStyle = isCancelado ? 'background:#fafafa;opacity:.65' : i%2===1 ? 'background:#fafffe' : '';
       const td  = `padding:6px 10px;vertical-align:middle;border-bottom:1px solid #eef3f0;${isCancelado?'text-decoration:line-through;color:#aaa':''}`;
       const tdr = `padding:6px 10px;vertical-align:middle;border-bottom:1px solid #eef3f0;border-right:2px solid #e8ede9;${isCancelado?'text-decoration:line-through;color:#aaa':''}`;
@@ -8348,10 +8344,8 @@ function renderTabelaPulv(){
         <td style="${td};font-weight:600" title="${p.cliente||''}">${p.cliente||'—'}${p.obs?`<div style="font-size:10px;color:#aaa;font-weight:400;text-decoration:none">${p.obs}</div>`:''}</td>
         <td style="${td};text-align:right">${parseFloat(p.area||0).toFixed(1)}</td>
         <td style="${tdr};text-align:right;color:var(--text2)">${parseFloat(p.valorHa||0).toFixed(0)}</td>
-        <td style="${td};color:${isCancelado?'#ccc':'#7a5200'}">${comIndNome?(comIndNome+(comIndPct?' ('+comIndPct.toFixed(0)+'%)':'')):'—'}</td>
-        <td style="${tdr};text-align:right;font-weight:700;color:${isCancelado?'#ccc':'#b8860b'}">${comIndVal?fmt(comIndVal):'—'}</td>
-        <td style="${td}">${aplHtml}</td>
-        <td style="${tdr};text-align:right">${aplValHtml}</td>
+        <td style="${tdr}">${comIndNome ? `<div style="display:flex;align-items:baseline;gap:8px;justify-content:space-between"><span style="color:${isCancelado?'#ccc':'#7a5200'}">${comIndNome}${comIndPct?' ('+comIndPct.toFixed(0)+'%)':''}</span><span style="font-weight:700;color:${isCancelado?'#ccc':'#b8860b'};white-space:nowrap">${fmt(comIndVal)}</span></div>` : '<span style="color:var(--text3)">—</span>'}</td>
+        <td style="${tdr}">${aplHtml}</td>
         <td style="${td};text-align:right;font-weight:800;color:${isCancelado?'#aaa':'var(--g1)'}">${fmt(p.total)}</td>
         <td style="padding:5px 6px;vertical-align:middle;border-bottom:1px solid #eef3f0;text-align:center">
           <button class="btn btn-ghost btn-xs" onclick="editarPulv('${p.id}')" title="Editar" style="padding:3px 5px;font-size:12px">✏️</button>
@@ -8364,10 +8358,8 @@ function renderTabelaPulv(){
         <td colspan="2" style="padding:7px 10px;color:var(--g1);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px">TOTAL (exceto cancelados)</td>
         <td style="padding:7px 10px;text-align:right;font-weight:800">${totalArea.toFixed(1)}</td>
         <td style="padding:7px 10px;text-align:right;font-weight:700;color:var(--g2);border-right:2px solid #e8ede9">${parseFloat(mediaHa||0).toFixed(0)}</td>
-        <td style="padding:7px 10px"></td>
-        <td style="padding:7px 10px;text-align:right;font-weight:700;color:#b8860b;border-right:2px solid #e8ede9">Ind: ${fmt(totalComInd)}</td>
-        <td style="padding:7px 10px"></td>
-        <td style="padding:7px 10px;text-align:right;font-weight:700;color:var(--red);border-right:2px solid #e8ede9">Apl: ${fmt(totalComApl)}</td>
+        <td style="padding:7px 10px;font-weight:700;color:#b8860b;border-right:2px solid #e8ede9">Ind: ${fmt(totalComInd)}</td>
+        <td style="padding:7px 10px;font-weight:700;color:var(--red);border-right:2px solid #e8ede9">Apl: ${fmt(totalComApl)}</td>
         <td style="padding:7px 10px;text-align:right;font-weight:800;color:var(--g1)">${fmt(totalVal)}</td>
         <td></td>
       </tr>
