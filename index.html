@@ -855,13 +855,19 @@ tbody tr:hover td{background:#fafffe;}
       <div style="display:grid;grid-template-columns:120px 130px 1fr 90px 90px 110px 1fr;gap:8px;margin-bottom:8px">
         <div class="field"><label>Data</label><input type="date" id="pulv-data"></div>
         <div class="field"><label>Status</label>
-          <select id="pulv-status" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--rsm);font-family:inherit;font-size:13px;color:var(--text);background:white">
+          <select id="pulv-status" onchange="atualizarCampoClientePulv()" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--rsm);font-family:inherit;font-size:13px;color:var(--text);background:white">
             <option value="agendado">📅 Agendado</option>
             <option value="executado" selected>✅ Executado</option>
             <option value="cancelado">❌ Cancelado</option>
           </select>
         </div>
-        <div class="field"><label>Cliente</label><select id="pulv-cliente" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--rsm);font-family:inherit;font-size:13px;color:var(--text);background:white"><option value="">— Cliente —</option></select></div>
+        <div class="field" id="pulv-cliente-wrap">
+          <label>Cliente</label>
+          <!-- Select: visível quando executado -->
+          <select id="pulv-cliente" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--rsm);font-family:inherit;font-size:13px;color:var(--text);background:white"><option value="">— Cliente —</option></select>
+          <!-- Input texto: visível quando agendado/cancelado -->
+          <input id="pulv-cliente-texto" type="text" placeholder="Nome do cliente" style="display:none;width:100%;padding:8px 10px;border:1.5px solid #f5d87a;border-radius:var(--rsm);font-family:inherit;font-size:13px;color:var(--text);background:#fffdf0;box-sizing:border-box">
+        </div>
         <div class="field"><label>Área (ha)</label><input type="number" step="0.01" id="pulv-area" placeholder="20" oninput="calcPulvTotal()"></div>
         <div class="field"><label>R$/ha</label><input type="number" step="0.01" id="pulv-valor-ha" placeholder="100" oninput="calcPulvTotal()"></div>
         <div class="field"><label>Total (R$)</label><input type="number" step="0.01" id="pulv-total" style="background:#e8f4e8;font-weight:700;color:var(--g1)" readonly></div>
@@ -8373,9 +8379,12 @@ function renderTabelaPulv(){
 function abrirFormPulv(){
   document.getElementById('pulv-edit-id').value='';
   document.getElementById('form-pulv-title').textContent='➕ Nova Pulverização';
-  ['pulv-data','pulv-cliente','pulv-area','pulv-valor-ha','pulv-total','pulv-comissao-nome','pulv-comissao-pct','pulv-comissao-val','pulv-obs'].forEach(id=>{
+  ['pulv-data','pulv-cliente','pulv-cliente-texto','pulv-area','pulv-valor-ha','pulv-total','pulv-comissao-nome','pulv-comissao-pct','pulv-comissao-val','pulv-obs'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
+  // Status padrão = executado → mostra select de cliente
+  const elSt = document.getElementById('pulv-status'); if(elSt) elSt.value='executado';
+  atualizarCampoClientePulv();
   popularSelectClientes();
   popularSelectIndicacao();
   document.getElementById('form-pulv').style.display='block';
@@ -8390,12 +8399,18 @@ function editarPulv(id){
   document.getElementById('pulv-data').value=p.data||'';
   popularSelectClientes();
   popularSelectIndicacao();
-  document.getElementById('pulv-cliente').value=p.cliente||'';
+  const elSt=document.getElementById('pulv-status'); if(elSt) elSt.value=p.status||'executado';
+  atualizarCampoClientePulv();
+  const st = p.status||'executado';
+  if(st === 'executado'){
+    document.getElementById('pulv-cliente').value=p.cliente||'';
+  } else {
+    document.getElementById('pulv-cliente-texto').value=p.cliente||'';
+  }
   document.getElementById('pulv-area').value=p.area||'';
   document.getElementById('pulv-valor-ha').value=p.valorHa||'';
   document.getElementById('pulv-total').value=p.total||'';
   document.getElementById('pulv-obs').value=p.obs||'';
-  const elSt=document.getElementById('pulv-status'); if(elSt) elSt.value=p.status||'executado';
   // Comissão Indicação
   document.getElementById('pulv-com-ind-nome').value=p.comIndNome||p.comissaoNome||'';
   document.getElementById('pulv-com-ind-pct').value=p.comIndPct||p.comissaoPct||'';
@@ -8408,6 +8423,26 @@ function editarPulv(id){
   if(apls.length) apls.forEach(a=>adicionarAplicador(a.nome,a.rpha));
   else adicionarAplicador();
   document.getElementById('form-pulv').style.display='block';
+}
+
+function atualizarCampoClientePulv(){
+  const st = document.getElementById('pulv-status')?.value || 'executado';
+  const elSelect = document.getElementById('pulv-cliente');
+  const elTexto  = document.getElementById('pulv-cliente-texto');
+  if(!elSelect || !elTexto) return;
+  if(st === 'executado'){
+    // mostra select, esconde texto
+    elTexto.style.display  = 'none';
+    elSelect.style.display = '';
+    // limpa o texto livre ao mudar para executado
+    elTexto.value = '';
+  } else {
+    // mostra texto livre, esconde select
+    elSelect.style.display = 'none';
+    elTexto.style.display  = '';
+    // limpa o select ao mudar para agendado/cancelado
+    elSelect.value = '';
+  }
 }
 
 function calcPulvTotal(){
@@ -8440,7 +8475,7 @@ async function salvarPulverizacao(){
     id,
     status:     document.getElementById('pulv-status')?.value || 'executado',
     data:       document.getElementById('pulv-data').value,
-    cliente:    document.getElementById('pulv-cliente').value.trim(),
+    cliente:    (()=>{ const st=document.getElementById('pulv-status')?.value||'executado'; return st==='executado' ? (document.getElementById('pulv-cliente')?.value||'').trim() : (document.getElementById('pulv-cliente-texto')?.value||'').trim(); })(),
     area,
     valorHa:    parseFloat(document.getElementById('pulv-valor-ha').value)||0,
     total:      parseFloat(document.getElementById('pulv-total').value)||0,
