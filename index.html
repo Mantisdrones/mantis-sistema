@@ -852,8 +852,15 @@ tbody tr:hover td{background:#fafffe;}
       <input type="hidden" id="pulv-edit-id">
 
       <!-- Linha 1: dados principais -->
-      <div style="display:grid;grid-template-columns:120px 1fr 90px 90px 110px 1fr;gap:8px;margin-bottom:8px">
+      <div style="display:grid;grid-template-columns:120px 130px 1fr 90px 90px 110px 1fr;gap:8px;margin-bottom:8px">
         <div class="field"><label>Data</label><input type="date" id="pulv-data"></div>
+        <div class="field"><label>Status</label>
+          <select id="pulv-status" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--rsm);font-family:inherit;font-size:13px;color:var(--text);background:white">
+            <option value="agendado">📅 Agendado</option>
+            <option value="executado" selected>✅ Executado</option>
+            <option value="cancelado">❌ Cancelado</option>
+          </select>
+        </div>
         <div class="field"><label>Cliente</label><select id="pulv-cliente" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--rsm);font-family:inherit;font-size:13px;color:var(--text);background:white"><option value="">— Cliente —</option></select></div>
         <div class="field"><label>Área (ha)</label><input type="number" step="0.01" id="pulv-area" placeholder="20" oninput="calcPulvTotal()"></div>
         <div class="field"><label>R$/ha</label><input type="number" step="0.01" id="pulv-valor-ha" placeholder="100" oninput="calcPulvTotal()"></div>
@@ -8216,6 +8223,15 @@ function popularSelectClientes(){
   if(atual) sel.value = atual;
 }
 
+async function alternarStatusPulv(id, novoStatus){
+  const p = _pulvCache[id]; if(!p) return;
+  p.status = novoStatus;
+  await db.ref('financeiro/meses/'+_mesSel+'/pulverizacoes/'+id+'/status').set(novoStatus);
+  renderTabelaPulv();
+  renderTotaisPulv();
+  atualizarResumoFin();
+}
+
 function renderTabelaPulv(){
   const el  = document.getElementById('fin-tabela-pulv');
   const fmt = v => 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -8227,120 +8243,131 @@ function renderTabelaPulv(){
   }
 
   // Filtros ativos
-  const filtData    = (document.getElementById('pulv-filtro-data')||{}).value||'';
-  const filtCliente = ((document.getElementById('pulv-filtro-cliente')||{}).value||'').toLowerCase().trim();
+  const filtDataAtual    = (document.getElementById('pulv-filtro-data')||{}).value||'';
+  const filtClienteAtual = (document.getElementById('pulv-filtro-cliente')||{}).value||'';
+  const filtStatusAtual  = (document.getElementById('pulv-filtro-status')||{}).value||'';
+  const filtCliente = filtClienteAtual.toLowerCase().trim();
   const lista = listaTotal.filter(p=>{
-    if(filtData    && (p.data||'')!==filtData) return false;
-    if(filtCliente && !(p.cliente||'').toLowerCase().includes(filtCliente)) return false;
+    if(filtDataAtual   && (p.data||'')!==filtDataAtual) return false;
+    if(filtCliente     && !(p.cliente||'').toLowerCase().includes(filtCliente)) return false;
+    if(filtStatusAtual && (p.status||'executado')!==filtStatusAtual) return false;
     return true;
   });
 
-  const totalArea   = lista.reduce((s,p)=>s+(parseFloat(p.area)||0),0);
-  const totalVal    = lista.reduce((s,p)=>s+(parseFloat(p.total)||0),0);
-  const totalComInd = lista.reduce((s,p)=>s+(parseFloat(p.comIndVal||p.comissaoVal)||0),0);
-  const totalComApl = lista.reduce((s,p)=>{
+  // Totais apenas dos executados (não cancelados)
+  const listaBilling = lista.filter(p=>(p.status||'executado')!=='cancelado');
+  const totalArea   = listaBilling.reduce((s,p)=>s+(parseFloat(p.area)||0),0);
+  const totalVal    = listaBilling.reduce((s,p)=>s+(parseFloat(p.total)||0),0);
+  const totalComInd = listaBilling.reduce((s,p)=>s+(parseFloat(p.comIndVal||p.comissaoVal)||0),0);
+  const totalComApl = listaBilling.reduce((s,p)=>{
     if(p.aplicadores && p.aplicadores.length)
       return s + p.aplicadores.reduce((ss,a)=>ss+(parseFloat(a.val)||0),0);
     return s + (parseFloat(p.comAplVal)||0);
   },0);
-  const totalCom    = totalComInd + totalComApl;
-  const mediaHa     = totalArea > 0 ? totalVal/totalArea : 0;
-
-  const despesas   = Object.values(_despesasCache||{}).reduce((s,d)=>s+(parseFloat(d.valor)||0),0);
-  const custoFixo  = (_custosCfg.custoFixo||[]).reduce((s,i)=>s+(parseFloat(i.valor)||0),0);
-  const lucro      = totalVal - totalCom - despesas - custoFixo;
+  const mediaHa = totalArea > 0 ? totalVal/totalArea : 0;
 
   // datas únicas para o select de filtro
   const datasUnicas = [...new Set(listaTotal.map(p=>p.data||'').filter(Boolean))].sort();
-  const filtDataAtual    = (document.getElementById('pulv-filtro-data')||{}).value||'';
-  const filtClienteAtual = (document.getElementById('pulv-filtro-cliente')||{}).value||'';
 
-  const thBase = 'padding:10px 12px;font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;background:#0d2818!important;border:none';
+  const thBase  = 'padding:7px 8px;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;background:#0d2818!important;border:none';
   const thMuted = thBase+';color:#7aab8e';
   const thWhite = thBase+';color:#ffffff';
   const thAmber = thBase+';color:#f5d87a';
   const thSalmon= thBase+';color:#ffa8a8';
 
+  // badges de status
+  const statusBadge = s => {
+    if(s==='agendado')  return `<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#1565c0;background:#e3f0ff;padding:2px 7px;border-radius:4px;cursor:pointer">📅 Agendado</span>`;
+    if(s==='cancelado') return `<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#b71c1c;background:#fdeaea;padding:2px 7px;border-radius:4px;cursor:pointer">❌ Cancelado</span>`;
+    return                     `<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#1a7a40;background:#e6f9ee;padding:2px 7px;border-radius:4px;cursor:pointer">✅ Executado</span>`;
+  };
+  const nextStatus = s => s==='agendado' ? 'executado' : s==='executado' ? 'cancelado' : 'agendado';
+
   // ── Tabela principal ──
   el.innerHTML = `
-  <div style="display:flex;align-items:center;gap:8px;padding:11px 16px;background:white;border-bottom:1px solid #e8ede9">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6a9e7e" stroke-width="2.5" style="flex-shrink:0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input id="pulv-filtro-cliente" type="text" placeholder="Buscar cliente..." value="${filtClienteAtual.replace(/"/g,'&quot;')}" oninput="renderTabelaPulv()" style="font-size:12px;padding:5px 10px;border:1px solid #d8e4dc;border-radius:6px;width:190px;color:#1a3028;outline:none;background:#f9fbf9">
-    <select id="pulv-filtro-data" onchange="renderTabelaPulv()" style="font-size:12px;padding:5px 10px;border:1px solid #d8e4dc;border-radius:6px;background:#f9fbf9;color:#1a3028;cursor:pointer;outline:none">
+  <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:white;border-bottom:1px solid #e8ede9;flex-wrap:wrap">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6a9e7e" stroke-width="2.5" style="flex-shrink:0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input id="pulv-filtro-cliente" type="text" placeholder="Buscar cliente..." value="${filtClienteAtual.replace(/"/g,'&quot;')}" oninput="renderTabelaPulv()" style="font-size:11px;padding:4px 8px;border:1px solid #d8e4dc;border-radius:5px;width:160px;color:#1a3028;outline:none;background:#f9fbf9">
+    <select id="pulv-filtro-data" onchange="renderTabelaPulv()" style="font-size:11px;padding:4px 8px;border:1px solid #d8e4dc;border-radius:5px;background:#f9fbf9;color:#1a3028;cursor:pointer;outline:none;max-width:140px">
       <option value="">Todas as datas</option>
-      ${datasUnicas.map(d=>`<option value="${d}"${d===filtDataAtual?' selected':''}>${new Date(d+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'})}</option>`).join('')}
+      ${datasUnicas.map(d=>`<option value="${d}"${d===filtDataAtual?' selected':''}>${new Date(d+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</option>`).join('')}
     </select>
-    ${(filtDataAtual||filtClienteAtual)?`<button onclick="document.getElementById('pulv-filtro-data').value='';document.getElementById('pulv-filtro-cliente').value='';renderTabelaPulv()" style="font-size:11px;padding:5px 10px;border:1px solid #fcc;border-radius:6px;background:#fff5f5;cursor:pointer;color:#c0392b;font-weight:600">✕ Limpar</button>`:''}
-    <span style="font-size:11px;color:#8aaa96;margin-left:auto;font-weight:500">${lista.length === listaTotal.length ? listaTotal.length+' registros' : lista.length+' de '+listaTotal.length}</span>
+    <select id="pulv-filtro-status" onchange="renderTabelaPulv()" style="font-size:11px;padding:4px 8px;border:1px solid #d8e4dc;border-radius:5px;background:#f9fbf9;color:#1a3028;cursor:pointer;outline:none">
+      <option value="">Todos os status</option>
+      <option value="agendado"${filtStatusAtual==='agendado'?' selected':''}>📅 Agendados</option>
+      <option value="executado"${filtStatusAtual==='executado'?' selected':''}>✅ Executados</option>
+      <option value="cancelado"${filtStatusAtual==='cancelado'?' selected':''}>❌ Cancelados</option>
+    </select>
+    ${(filtDataAtual||filtCliente||filtStatusAtual)?`<button onclick="['pulv-filtro-data','pulv-filtro-cliente','pulv-filtro-status'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});renderTabelaPulv()" style="font-size:10px;padding:4px 8px;border:1px solid #fcc;border-radius:5px;background:#fff5f5;cursor:pointer;color:#c0392b;font-weight:600">✕ Limpar</button>`:''}
+    <span style="font-size:10px;color:#8aaa96;margin-left:auto;font-weight:500">${lista.length === listaTotal.length ? listaTotal.length+' registros' : lista.length+'/'+listaTotal.length}</span>
   </div>
-  <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;min-width:700px">
+  <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;min-width:720px">
     <colgroup>
-      <col style="width:58px">
-      <col style="width:120px">
-      <col style="width:62px">
-      <col style="width:78px">
-      <col style="width:98px">
-      <col style="width:115px">
-      <col style="width:78px">
-      <col style="width:145px">
-      <col style="width:78px">
-      <col style="width:50px">
+      <col style="width:48px"><col style="width:90px"><col style="width:105px"><col style="width:52px">
+      <col style="width:62px"><col style="width:82px"><col style="width:100px"><col style="width:60px">
+      <col style="width:120px"><col style="width:60px"><col style="width:40px">
     </colgroup>
-    <thead>
-      <tr>
-        <th style="${thMuted};text-align:left">Data</th>
-        <th style="${thMuted};text-align:left">Cliente</th>
-        <th style="${thMuted};text-align:right">Área</th>
-        <th style="${thMuted};text-align:right">R$/ha</th>
-        <th style="${thWhite};text-align:right">Total</th>
-        <th style="${thAmber};text-align:center">Com. Indicação</th>
-        <th style="${thAmber};text-align:right">Val. Ind.</th>
-        <th style="${thSalmon};text-align:center">Com. Aplicação</th>
-        <th style="${thSalmon};text-align:right">Val. Apl.</th>
-        <th style="${thBase}"></th>
-      </tr>
-    </thead>
+    <thead><tr>
+      <th style="${thMuted};text-align:center">Status</th>
+      <th style="${thMuted};text-align:left">Data</th>
+      <th style="${thMuted};text-align:left">Cliente</th>
+      <th style="${thMuted};text-align:right">Área</th>
+      <th style="${thMuted};text-align:right">R$/ha</th>
+      <th style="${thWhite};text-align:right">Total</th>
+      <th style="${thAmber};text-align:center">Comissão<br>Indicação</th>
+      <th style="${thAmber};text-align:right">Valor<br>Indicação</th>
+      <th style="${thSalmon};text-align:center">Comissão<br>Aplicação</th>
+      <th style="${thSalmon};text-align:right">Valor<br>Aplicação</th>
+      <th style="${thBase}"></th>
+    </tr></thead>
     <tbody>
     ${lista.map((p,i)=>{
+      const st = p.status||'executado';
+      const isCancelado = st==='cancelado';
       const comIndVal  = parseFloat(p.comIndVal||p.comissaoVal||0);
       const comIndNome = p.comIndNome||p.comissaoNome||'';
       const comIndPct  = parseFloat(p.comIndPct||p.comissaoPct||0);
       const apls = p.aplicadores&&p.aplicadores.length ? p.aplicadores
                  : (p.comAplNome ? [{nome:p.comAplNome,rpha:p.comAplRpha||0,val:p.comAplVal||0}] : []);
       const aplHtml = apls.length
-        ? apls.map(a=>`<div style="text-align:center;font-size:11px;color:#7a0000;white-space:nowrap">${a.nome}<span style="color:#bbb;font-size:10px"> (R$${parseFloat(a.rpha||0).toFixed(2)}/ha)</span></div>`).join('')
-        : '<div style="text-align:center;color:var(--text3)">—</div>';
+        ? apls.map(a=>`<div style="font-size:10px;color:${isCancelado?'#bbb':'#7a0000'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.nome}<span style="color:#ccc;font-size:9px"> (R$${parseFloat(a.rpha||0).toFixed(2)}/ha)</span></div>`).join('')
+        : '<div style="color:var(--text3)">—</div>';
       const aplValHtml = apls.length
-        ? apls.map(a=>`<div style="text-align:right;font-weight:700;color:var(--red);white-space:nowrap">${fmt(a.val||(a.rpha||0)*parseFloat(p.area||0))}</div>`).join('')
-        : '<div style="text-align:right;color:var(--text3)">—</div>';
-      return `<tr style="border-bottom:1px solid #eef3f0;${i%2===1?'background:#fafffe':''}">
-        <td style="padding:9px 10px;color:var(--text2);white-space:nowrap">${p.data?new Date(p.data+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'—'}</td>
-        <td style="padding:9px 10px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.cliente||''}">${p.cliente||'—'}</td>
-        <td style="padding:9px 10px;text-align:right">${parseFloat(p.area||0).toFixed(2)}</td>
-        <td style="padding:9px 10px;text-align:right;color:var(--text2)">${fmt(p.valorHa)}</td>
-        <td style="padding:9px 10px;text-align:right;font-weight:800;color:var(--g1)">${fmt(p.total)}</td>
-        <td style="padding:9px 10px;text-align:center;font-size:11px;color:#7a5200">${comIndNome?(comIndNome+(comIndPct?' ('+comIndPct.toFixed(0)+'%)':'')):'—'}</td>
-        <td style="padding:9px 10px;text-align:right;font-weight:700;color:#b8860b;white-space:nowrap">${comIndVal?fmt(comIndVal):'—'}</td>
-        <td style="padding:9px 10px">${aplHtml}</td>
-        <td style="padding:9px 10px">${aplValHtml}</td>
-        <td style="padding:9px 10px;text-align:center;white-space:nowrap">
-          <button class="btn btn-ghost btn-xs" onclick="editarPulv('${p.id}')" title="Editar">✏️</button>
-          <button class="btn btn-danger btn-xs" onclick="excluirPulv('${p.id}')" title="Excluir">🗑</button>
+        ? apls.map(a=>`<div style="font-weight:700;color:${isCancelado?'#ccc':'var(--red)'};white-space:nowrap">${fmt(a.val||(a.rpha||0)*parseFloat(p.area||0))}</div>`).join('')
+        : '<div style="color:var(--text3)">—</div>';
+      const rowStyle = isCancelado ? 'background:#fafafa;opacity:.6' : i%2===1 ? 'background:#fafffe' : '';
+      const tdStyle = `padding:6px 8px;${isCancelado?'text-decoration:line-through;color:#aaa':''}`;
+      return `<tr style="border-bottom:1px solid #eef3f0;${rowStyle}">
+        <td style="padding:5px 6px;text-align:center">
+          <div onclick="alternarStatusPulv('${p.id}','${nextStatus(st)}')" title="Clique para: ${nextStatus(st)}" style="cursor:pointer">${statusBadge(st)}</div>
+        </td>
+        <td style="${tdStyle};white-space:nowrap;color:var(--text2)">${p.data?new Date(p.data+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'—'}${p.obs?`<div style="font-size:9px;color:#aaa;text-decoration:none">${p.obs}</div>`:''}</td>
+        <td style="${tdStyle};font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.cliente||''}">${p.cliente||'—'}</td>
+        <td style="${tdStyle};text-align:right">${parseFloat(p.area||0).toFixed(2)}</td>
+        <td style="${tdStyle};text-align:right;color:var(--text2)">${fmt(p.valorHa)}</td>
+        <td style="${tdStyle};text-align:right;font-weight:800;color:${isCancelado?'#aaa':'var(--g1)'}">${fmt(p.total)}</td>
+        <td style="padding:6px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${isCancelado?'#ccc':'#7a5200'};font-size:10px">${comIndNome?(comIndNome+(comIndPct?' ('+comIndPct.toFixed(0)+'%)':'')):'—'}</td>
+        <td style="${tdStyle};text-align:right;font-weight:700;color:${isCancelado?'#ccc':'#b8860b'};white-space:nowrap">${comIndVal?fmt(comIndVal):'—'}</td>
+        <td style="padding:6px 8px">${aplHtml}</td>
+        <td style="padding:6px 8px">${aplValHtml}</td>
+        <td style="padding:5px 4px;text-align:center;white-space:nowrap">
+          <button class="btn btn-ghost btn-xs" onclick="editarPulv('${p.id}')" title="Editar" style="padding:2px 4px;font-size:11px">✏️</button>
+          <button class="btn btn-danger btn-xs" onclick="excluirPulv('${p.id}')" title="Excluir" style="padding:2px 4px;font-size:11px">🗑</button>
         </td>
       </tr>`;}).join('')}
     </tbody>
     <tfoot>
       <tr style="background:var(--g6);border-top:2px solid var(--g4)">
-        <td colspan="2" style="padding:9px 10px;color:var(--g1);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px">TOTAL DO MÊS</td>
-        <td style="padding:9px 10px;text-align:right;font-weight:800">${totalArea.toFixed(2)}</td>
-        <td style="padding:9px 10px;text-align:right;font-weight:700;color:var(--g2)">${fmt(mediaHa)}</td>
-        <td style="padding:9px 10px;text-align:right;font-weight:800;color:var(--g1)">${fmt(totalVal)}</td>
-        <td style="padding:9px 10px;text-align:center;font-weight:700;color:#b8860b" colspan="2">Ind: ${fmt(totalComInd)}</td>
-        <td style="padding:9px 10px;text-align:center;font-weight:700;color:var(--red)" colspan="2">Apl: ${fmt(totalComApl)}</td>
+        <td colspan="3" style="padding:7px 8px;color:var(--g1);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px">TOTAL FATURADO (exceto cancelados)</td>
+        <td style="padding:7px 8px;text-align:right;font-weight:800;font-size:11px">${totalArea.toFixed(2)}</td>
+        <td style="padding:7px 8px;text-align:right;font-weight:700;color:var(--g2);font-size:11px">${fmt(mediaHa)}</td>
+        <td style="padding:7px 8px;text-align:right;font-weight:800;color:var(--g1);font-size:12px">${fmt(totalVal)}</td>
+        <td style="padding:7px 8px;text-align:center;font-weight:700;color:#b8860b;font-size:11px" colspan="2">Ind: ${fmt(totalComInd)}</td>
+        <td style="padding:7px 8px;text-align:center;font-weight:700;color:var(--red);font-size:11px" colspan="2">Apl: ${fmt(totalComApl)}</td>
         <td></td>
       </tr>
     </tfoot>
-  </table></div></div>`;
+  </table></div>`;
 }
 
 function abrirFormPulv(){
@@ -8368,6 +8395,7 @@ function editarPulv(id){
   document.getElementById('pulv-valor-ha').value=p.valorHa||'';
   document.getElementById('pulv-total').value=p.total||'';
   document.getElementById('pulv-obs').value=p.obs||'';
+  const elSt=document.getElementById('pulv-status'); if(elSt) elSt.value=p.status||'executado';
   // Comissão Indicação
   document.getElementById('pulv-com-ind-nome').value=p.comIndNome||p.comissaoNome||'';
   document.getElementById('pulv-com-ind-pct').value=p.comIndPct||p.comissaoPct||'';
@@ -8410,6 +8438,7 @@ async function salvarPulverizacao(){
 
   const p = {
     id,
+    status:     document.getElementById('pulv-status')?.value || 'executado',
     data:       document.getElementById('pulv-data').value,
     cliente:    document.getElementById('pulv-cliente').value.trim(),
     area,
