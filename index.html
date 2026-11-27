@@ -508,8 +508,14 @@ tbody tr:hover td{background:#fafffe;}
   </div>
   <div id="tab-clientes-lista" class="tab-content active">
     <div class="card"><div class="tw"><table>
-      <thead><tr><th>Nome</th><th>CPF/CNPJ</th><th>Cidade</th><th>Fazendas</th><th>Ações</th></tr></thead>
-      <tbody id="tbody-clientes"><tr><td colspan="5"><div class="loading"><div class="spinner"></div>Carregando...</div></td></tr></tbody>
+      <thead><tr><th>Nome</th><th>CPF/CNPJ</th><th>Cidade</th><th>Fazendas</th><th>Área Total</th><th>Ações</th></tr></thead>
+      <tbody id="tbody-clientes"><tr><td colspan="6"><div class="loading"><div class="spinner"></div>Carregando...</div></td></tr></tbody>
+      <tfoot><tr style="background:var(--g6);border-top:2px solid var(--g4)">
+        <td colspan="3" style="padding:7px 10px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--g1)">TOTAL MAPEADO</td>
+        <td style="padding:7px 10px;font-weight:700;text-align:center" id="total-fazendas-count">—</td>
+        <td style="padding:7px 10px;font-weight:800;color:var(--g1)" id="total-area-mapeada">—</td>
+        <td></td>
+      </tr></tfoot>
     </table></div></div>
   </div>
   <div id="tab-clientes-form-cliente" class="tab-content" style="display:none">
@@ -1738,16 +1744,27 @@ async function salvarCliente(){
 function renderClientes(){
   const tb=document.getElementById('tbody-clientes');
   const lista=Object.values(DB.clientes||{});
-  if(!lista.length){tb.innerHTML='<tr><td colspan="5"><div class="empty"><div class="empty-icon">👥</div><p>Nenhum cliente</p></div></td></tr>';return;}
-  tb.innerHTML=lista.map(c=>`<tr>
+  if(!lista.length){tb.innerHTML='<tr><td colspan="6"><div class="empty"><div class="empty-icon">👥</div><p>Nenhum cliente</p></div></td></tr>';return;}
+  let totalAreaGeral=0, totalFazendasGeral=0;
+  tb.innerHTML=lista.map(c=>{
+    const fazs=Object.values(c.fazendas||{});
+    const areaCliente=fazs.reduce((s,f)=>s+(parseFloat(f.area)||0),0);
+    totalAreaGeral+=areaCliente;
+    totalFazendasGeral+=fazs.length;
+    return `<tr>
     <td><strong>${c.nome}</strong></td><td style="font-family:monospace">${c.doc||'—'}</td><td>${c.cidade||'—'}</td>
-    <td><span class="badge bg">${Object.keys(c.fazendas||{}).length} fazenda(s)</span></td>
+    <td><span class="badge bg">${fazs.length} fazenda(s)</span></td>
+    <td style="font-weight:600;color:var(--g2)">${areaCliente>0?areaCliente.toFixed(1)+' ha':'—'}</td>
     <td style="display:flex;gap:5px;flex-wrap:wrap">
       <button class="btn btn-outline btn-sm" onclick="verFazendas('${c.id}')">🏡 Fazendas</button>
       <button class="btn btn-outline btn-sm" onclick="editarCliente('${c.id}')">✏️ Editar</button>
       <button class="btn btn-danger btn-sm" onclick="excluirCliente('${c.id}')">🗑</button>
     </td>
-  </tr>`).join('');
+  </tr>`;}).join('');
+  const elArea=document.getElementById('total-area-mapeada');
+  const elFaz=document.getElementById('total-fazendas-count');
+  if(elArea) elArea.textContent=totalAreaGeral>0?totalAreaGeral.toFixed(1)+' ha':'—';
+  if(elFaz) elFaz.textContent=totalFazendasGeral+' fazenda(s)';
 }
 
 async function excluirCliente(id){
